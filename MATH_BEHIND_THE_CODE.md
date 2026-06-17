@@ -12,7 +12,7 @@ The current configuration is:
 | \(L\) | \(6\) | Number of Transformer blocks |
 | \(H\) | \(6\) | Number of attention heads |
 | \(d_h\) | \(64\) | Dimension of each attention head |
-| \(w\) | \(3\) | Exact local attention window |
+| \(w\) | \(3\) | Exact local attention window, derived as \(b-1\) |
 | \(K\) | \(64\) | Maximum number of compressed global blocks |
 | \(b\) | \(4\) | Number of tokens in each global block |
 | \(V\) | \(64\) | Character vocabulary size for the current dataset |
@@ -33,12 +33,24 @@ b = \frac{T_{\max}}{K}
   = 4.
 $$
 
+In `config.py`, this same value is named `causal_block_size`:
+
+$$
+\texttt{causal\_block\_size}=b=4.
+$$
+
+The local attention window is derived from the causal block size:
+
+$$
+w = b - 1 = 4 - 1 = 3.
+$$
+
 The code supports two values of `attention_type`:
 
 1. `standard`
 2. `causal_blockwise_linformer`
 
-Everything outside the attention sublayer is shared by the two models.
+The current default in `config.py` is `standard`. Switching to `causal_blockwise_linformer` activates the local-plus-compressed-global attention module. The main model class is `MyGPT`; everything outside the attention sublayer is shared by the two attention modes.
 
 ## Character Tokenization and Dataset
 
@@ -478,7 +490,13 @@ $$
 \}.
 $$
 
-With \(w=3\):
+Because `local_window = causal_block_size - 1`, the current value is
+
+$$
+w = b - 1 = 3.
+$$
+
+So:
 
 $$
 \mathcal{L}_i
@@ -1186,7 +1204,7 @@ $$
 \mathcal{L}_{\text{train}}^{(s)}
 $$
 
-for every optimization step \(s\).
+for every optimization step \(s\). `train.py` saves each plot in `docs/` with the attention type and a timestamp in the filename, so repeated runs do not overwrite earlier plots.
 
 ## Full Validation Loss
 
@@ -1523,7 +1541,7 @@ $$
 For this project:
 
 $$
-w=3,\qquad K=64,\qquad b=4.
+K=64,\qquad b=4,\qquad w = b - 1 = 3.
 $$
 
 The implementation preserves autoregressive causality, supports variable runtime prefix lengths, and introduces only 18,432 parameters beyond the standard model. Its global branch has compressed linear-size attention, while the current dense local branch remains the main piece that must be optimized before the complete implementation achieves linear attention complexity.
