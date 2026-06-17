@@ -1,7 +1,5 @@
-ignore.txt
 *.pth
 *.ipynb
-Goal.md
 __pycache__
 .DS_Store
 **/.DS_Store
