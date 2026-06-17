@@ -10,8 +10,7 @@ class MultiHeadAttention(nn.Module):
     def __init__(self):
         super().__init__()
         self.qkv = nn.Linear(d_hidden, 3*d_hidden, bias=False)
-        self.register_buffer("tril", torch.tril(
-            torch.ones(block_size, block_size)))
+        self.register_buffer("tril", torch.tril(torch.ones(block_size, block_size)))
         self.mix = nn.Linear(d_hidden, d_hidden)
         self.drop = nn.Dropout(dropout)
 
@@ -19,18 +18,15 @@ class MultiHeadAttention(nn.Module):
         B, T, C = x.shape
         qkv = self.qkv(x)
         q, k, v = torch.chunk(qkv, 3, dim=-1)  # each [B,T,d_hidden]
-        q = q.view(B, T, n_heads, d_head).transpose(
-            1, 2).contiguous()  # [B,n_head,T,d_head]
+        q = q.view(B, T, n_heads, d_head).transpose(1, 2).contiguous()  # [B,n_head,T,d_head]
         k = k.view(B, T, n_heads, d_head).transpose(1, 2).contiguous()
         v = v.view(B, T, n_heads, d_head).transpose(1, 2).contiguous()
 
-        # [B,n_head,T_q,d_head] @ [B,n_head,d_head,T_k] = [B,n_head,T_q,T_k]
-        wei = (q @ k.transpose(-1, -2)) * (d_head**-0.5)
+        wei = (q @ k.transpose(-1, -2)) * (d_head**-0.5) # [B,n_head,T_q,d_head] @ [B,n_head,d_head,T_k] = [B,n_head,T_q,T_k]
         wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf'))
-        wei = F.softmax(wei, dim=-1)
-        # [B,n_head,T_q,T_k] @ # [B,n_head,T_k,d_head] = [B,n_head,T_q,d_head]
+        wei = F.softmax(wei, dim=-1) 
         wei = self.drop(wei)
-        attn = wei @ v
+        attn = wei @ v # [B,n_head,T_q,T_k] @ [B,n_head,T_k,d_head] = [B,n_head,T_q,d_head]
 
         attn = attn.transpose(1, 2).reshape(B, T, d_hidden)  # [B,T,d_hidden]
         attn = self.mix(attn)
@@ -38,33 +34,31 @@ class MultiHeadAttention(nn.Module):
         return attn
 
 
-class CausalBlockwiseLinformerAttention(nn.Module):  # [Codex comment] Add the requested local-exact plus global-compressed causal attention module.
-    def __init__(  # [Codex comment] Allow defaults from config while supporting small explicit settings in tests.
-        self,  # [Codex comment] Receive the module instance.
-        max_context_length=block_size,  # [Codex comment] Use the configured maximum context to define fixed global block boundaries.
+class CausalBlockwiseLinformerAttention(nn.Module):  
+    def __init__(  
+        self,  
         hidden_size=d_hidden,  # [Codex comment] Match the model hidden width by default.
         num_heads=n_heads,  # [Codex comment] Match the configured attention-head count by default.
         window_size=local_window,  # [Codex comment] Use the configured exact local window by default.
         global_blocks=num_global_blocks,  # [Codex comment] Use the configured number of global summaries by default.
         share_projections=share_linformer_projections_across_heads,  # [Codex comment] Respect whether compression weights are shared across heads.
         attention_dropout=dropout,  # [Codex comment] Reuse the model dropout rate for attention weights and outputs.
-    ):  # [Codex comment] Finish the configurable constructor signature.
-        super().__init__()  # [Codex comment] Initialize PyTorch module bookkeeping.
+    ):  
+        super().__init__()  
         if hidden_size % num_heads != 0:  # [Codex comment] Ensure each head receives an integer feature width.
             raise ValueError("hidden_size must be divisible by num_heads")  # [Codex comment] Report an invalid head configuration clearly.
-        if max_context_length % global_blocks != 0:  # [Codex comment] Require fixed maximum-context blocks to have equal sizes.
-            raise ValueError("max_context_length must be divisible by global_blocks")  # [Codex comment] Explain the fixed-block configuration requirement.
+        if block_size % global_blocks != 0:  # [Codex comment] Require fixed maximum-context blocks to have equal sizes.
+            raise ValueError("block_size must be divisible by global_blocks")  # [Codex comment] Explain the fixed-block configuration requirement.
         if window_size <= 0:  # [Codex comment] Reject a local branch that would leave queries without any valid exact key.
             raise ValueError("window_size must be positive")  # [Codex comment] Explain the valid local-window range.
-        self.max_context_length = max_context_length  # [Codex comment] Store the largest supported runtime prefix length.
         self.hidden_size = hidden_size  # [Codex comment] Store the width used when heads are merged.
         self.num_heads = num_heads  # [Codex comment] Store the number of parallel attention heads.
         self.head_size = hidden_size // num_heads  # [Codex comment] Derive the feature width handled by each head.
         self.window_size = window_size  # [Codex comment] Store the exact causal sliding-window width.
         self.global_blocks = global_blocks  # [Codex comment] Store the maximum number of compressed block summaries.
-        self.global_block_size = max_context_length // global_blocks  # [Codex comment] Fix block width from maximum context rather than runtime prefix length.
+        self.global_block_size = block_size // global_blocks  # [Codex comment] Fix block width from maximum context rather than runtime prefix length.
         self.share_projections = share_projections  # [Codex comment] Remember whether all heads use the same compression weights.
-        self.qkv = nn.Linear(hidden_size, 3 * hidden_size, bias=False)  # [Codex comment] Project hidden states to queries, keys, and values together.
+        self.qkv = nn.Linear(hidden_size, 3 * hidden_size, bias=False)  
         projection_shape = (global_blocks, self.global_block_size) if share_projections else (num_heads, global_blocks, self.global_block_size)  # [Codex comment] Choose shared or per-head blockwise projection parameter shapes.
         self.E = nn.Parameter(torch.full(projection_shape, 1.0 / self.global_block_size))  # [Codex comment] Initialize key compression as average pooling within each block.
         self.F = nn.Parameter(torch.full(projection_shape, 1.0 / self.global_block_size))  # [Codex comment] Initialize value compression as average pooling within each block.
@@ -94,15 +88,15 @@ class CausalBlockwiseLinformerAttention(nn.Module):  # [Codex comment] Add the r
             v_tilde = torch.einsum("bhkrd,hkr->bhkd", v_blocks, self.F[:, :num_completed_blocks])  # [Codex comment] Produce per-head compressed values for completed blocks.
         return k_tilde, v_tilde  # [Codex comment] Return summaries used by the global attention branch.
 
-    def forward(self, x):  # [Codex comment] Compute local and global causal attention for a hidden-state sequence.
-        B, T, _ = x.shape  # [Codex comment] Read batch size and the changing runtime prefix length.
-        if T > self.max_context_length:  # [Codex comment] Prevent indexing beyond the configured fixed block layout.
-            raise ValueError("runtime sequence length exceeds max_context_length")  # [Codex comment] Report unsupported overlong contexts clearly.
-        q, k, v = torch.chunk(self.qkv(x), 3, dim=-1)  # [Codex comment] Compute query, key, and value projections in one operation.
-        q = q.view(B, T, self.num_heads, self.head_size).transpose(1, 2)  # [Codex comment] Split queries into [batch, head, time, head-size].
-        k = k.view(B, T, self.num_heads, self.head_size).transpose(1, 2)  # [Codex comment] Split keys into [batch, head, time, head-size].
-        v = v.view(B, T, self.num_heads, self.head_size).transpose(1, 2)  # [Codex comment] Split values into [batch, head, time, head-size].
-        scale = self.head_size ** -0.5  # [Codex comment] Apply standard scaled dot-product normalization.
+    def forward(self, x):  # x.shape = [B,T,C]
+        B, T, _ = x.shape  
+        if T > block_size:  
+            raise ValueError("runtime sequence length exceeds block_size")  
+        q, k, v = torch.chunk(self.qkv(x), 3, dim=-1)  
+        q = q.view(B, T, n_heads, d_head).transpose(1, 2)  
+        k = k.view(B, T, n_heads, d_head).transpose(1, 2)  
+        v = v.view(B, T, n_heads, d_head).transpose(1, 2) 
+        scale = d_head ** -0.5  
 
         local_scores = (q @ k.transpose(-1, -2)) * scale  # [Codex comment] Compute dense scores for the correctness-first local implementation.
         local_mask = self._build_local_mask(T, x.device)  # [Codex comment] Restrict local scores to causal keys inside the recent window.
@@ -147,12 +141,12 @@ class Block(nn.Module):
     def __init__(self):
         super().__init__()
         self.pre_attn_ln = nn.LayerNorm(d_hidden)
-        if attention_type == "standard":  # [Codex comment] Preserve standard causal attention as the default selectable implementation.
-            self.attn = MultiHeadAttention()  # [Codex comment] Construct the unchanged baseline attention module.
-        elif attention_type == "causal_blockwise_linformer":  # [Codex comment] Select the new operator only when explicitly configured.
-            self.attn = CausalBlockwiseLinformerAttention()  # [Codex comment] Construct the blockwise Linformer attention with config defaults.
-        else:  # [Codex comment] Reject misspelled or unsupported attention configuration values.
-            raise ValueError(f"Unknown attention_type: {attention_type}")  # [Codex comment] Surface the invalid attention type at model construction time.
+        if attention_type == "standard": 
+            self.attn = MultiHeadAttention()  
+        elif attention_type == "causal_blockwise_linformer":  
+            self.attn = CausalBlockwiseLinformerAttention()  
+        else:  
+            raise ValueError(f"Unknown attention_type: {attention_type}")  
         self.pre_ffwd_ln = nn.LayerNorm(d_hidden)
         self.ffwd = FeedForward()
 
