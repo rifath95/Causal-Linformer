@@ -140,7 +140,7 @@ class Block(nn.Module):
         return x
 
 
-class TestGPT(nn.Module):
+class MyGPT(nn.Module):
     def __init__(self):
         super().__init__()
         self.token_embedding_table = nn.Embedding(vocab_size, d_hidden)

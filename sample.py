@@ -2,9 +2,9 @@ import torch
 
 from config import *
 from data import encode, decode
-from model import TestGPT
+from model import MyGPT
 
-model = TestGPT()
+model = MyGPT()
 model.load_state_dict(torch.load("model.pth", map_location=device))
 model = model.to(device)
 model.eval()
