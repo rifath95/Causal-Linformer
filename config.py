@@ -24,6 +24,9 @@ assert d_hidden % n_heads == 0, "hidden size must be divisble by number of heads
 d_head = d_hidden//n_heads
 
 attention_type =  "standard"  # Switch between "standard" and "causal_blockwise_linformer"
-local_window = 3  #  Number of recent tokens used by the exact local attention branch.
 num_global_blocks = 64  # Number of compressed key/value vectors
+assert block_size % num_global_blocks == 0, "block_size must be divisible by num_global_blocks"
+causal_block_size = block_size // num_global_blocks # How many key/value pairs are being compressed within each causal block.
+local_window = causal_block_size - 1  #  Number of recent tokens used by the exact local attention branch. With this value, there will not be any gaps.
+assert local_window > 0, "local_window must be positive"
 share_linformer_projections_across_heads = False  # Set True to share projection matrices E and F across heads
