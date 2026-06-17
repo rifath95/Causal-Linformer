@@ -93,10 +93,10 @@ class CausalBlockwiseLinformerAttention(nn.Module):
             global_mask = self._build_global_mask(T, num_completed_blocks, x.device)  # Enforce that each query sees only blocks completed by that position.
             global_scores = global_scores.masked_fill(~global_mask, float("-inf"))  #  Mask compressed blocks that are still future information for a query.
             has_global = global_mask.any(dim=-1)  # Identify query rows with at least one causally available block.
-            global_scores[:, :, ~has_global, :] = 0.0  # Avoid all-negative-infinity softmax rows and their resulting NaNs.
+            global_scores = global_scores.masked_fill((~has_global).view(1, 1, T, 1), 0.0)  # Avoid all-negative-infinity softmax rows and their resulting NaNs.
             
             global_scores = F.softmax(global_scores, dim=-1)
-            global_scores[:, :, ~has_global, :] = 0.0 # Remove the fake softmax probabilities used only to avoid NaNs for queries with no completed global block.
+            global_scores = global_scores.masked_fill((~has_global).view(1, 1, T, 1), 0.0) # Remove the fake softmax probabilities used only to avoid NaNs for queries with no completed global block.
             global_scores = self.drop(global_scores)  
             global_out = global_scores @ v_tilde  # [B,n_head,T,num_completed_blocks] @ [B,n_head,num_completed_blocks,d_head] = [B,n_head,T,d_head]
             

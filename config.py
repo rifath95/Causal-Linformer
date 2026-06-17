@@ -23,7 +23,7 @@ n_heads = 6
 assert d_hidden % n_heads == 0, "hidden size must be divisble by number of heads to get a integer head size"
 d_head = d_hidden//n_heads
 
-attention_type =  "standard"  # Switch between "standard" and "causal_blockwise_linformer"
+attention_type =  "causal_blockwise_linformer"  # Switch between "standard" and "causal_blockwise_linformer"
 num_global_blocks = 64  # Number of compressed key/value vectors
 assert block_size % num_global_blocks == 0, "block_size must be divisible by num_global_blocks"
 causal_block_size = block_size // num_global_blocks # How many key/value pairs are being compressed within each causal block.
