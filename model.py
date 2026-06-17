@@ -38,34 +38,34 @@ class CausalBlockwiseLinformerAttention(nn.Module):
     def __init__(self):  
         super().__init__()   
         self.qkv = nn.Linear(d_hidden, 3 * d_hidden, bias=False)  
-        projection_shape = (num_global_blocks, causal_block_size) if share_linformer_projections_across_heads else (n_heads, num_global_blocks, causal_block_size)  # [Codex comment] Choose shared or per-head E/F shapes directly from config.py.
-        self.E = nn.Parameter(torch.full(projection_shape, 1.0 / causal_block_size))  # [Codex comment] Initialize key compression as average pooling within each block.
-        self.F = nn.Parameter(torch.full(projection_shape, 1.0 / causal_block_size))  # [Codex comment] Initialize value compression as average pooling within each block.
-        self.mix = nn.Linear(d_hidden, d_hidden)  # [Codex comment] Mix merged attention heads using the configured model width.
-        self.drop = nn.Dropout(dropout)  # [Codex comment] Apply config dropout to attention probabilities and projected output.
+        projection_shape = (num_global_blocks, causal_block_size) if share_linformer_projections_across_heads else (n_heads, num_global_blocks, causal_block_size)  #  Choose shared or per-head E/F shapes directly from config.py.
+        self.E = nn.Parameter(torch.full(projection_shape, 1.0 / causal_block_size))  # Initialize key and value compression as averaging within each block.
+        self.F = nn.Parameter(torch.full(projection_shape, 1.0 / causal_block_size))  
+        self.mix = nn.Linear(d_hidden, d_hidden)  
+        self.drop = nn.Dropout(dropout)  
 
-    def _build_local_mask(self, length, device):  # [Codex comment] Build the dense exact-local causal mask for a runtime prefix.
-        positions = torch.arange(length, device=device)  # [Codex comment] Create query and key position indices on the input device.
-        distance = positions[:, None] - positions[None, :]  # [Codex comment] Measure how far each key lies behind each query.
-        return (distance >= 0) & (distance < local_window)  # [Codex comment] Allow only current and recent keys inside the config local window.
+    def _build_local_mask(self, length, device):  
+        positions = torch.arange(length, device=device)  
+        distance = positions[:, None] - positions[None, :]  #  Measure how far each key lies behind each query.
+        return (distance >= 0) & (distance < local_window)  # Allow only current and recent keys inside the config local window.
 
-    def _build_global_mask(self, length, num_completed_blocks, device):  # [Codex comment] Build the inclusive causal mask over completed global blocks.
-        query_positions = torch.arange(length, device=device)[:, None]  # [Codex comment] Represent every runtime query position as a mask row.
-        block_ends = (torch.arange(num_completed_blocks, device=device) + 1) * causal_block_size - 1  # [Codex comment] Compute the final token position of each completed block.
-        return block_ends[None, :] <= query_positions  # [Codex comment] Allow a block starting at its final token because its full contents are then causal.
+    def _build_global_mask(self, length, num_completed_blocks, device):  # Build the inclusive causal mask over completed global blocks.
+        query_positions = torch.arange(length, device=device)[:, None]  # Represent every runtime query position as a mask row.
+        block_ends = (torch.arange(num_completed_blocks, device=device) + 1) * causal_block_size - 1  # Compute the final token position of each completed block.
+        return block_ends[None, :] <= query_positions  #  Allow a block starting at its final token because its full contents are then causal.
 
-    def _compress_completed_blocks(self, k, v, num_completed_blocks):  # [Codex comment] Compress only blocks fully present in the current runtime prefix.
-        B, H, _, Dh = k.shape  # [Codex comment] Read dimensions needed to reshape completed key and value tokens.
-        completed_length = num_completed_blocks * causal_block_size  # [Codex comment] Exclude the trailing partial block from global compression.
-        k_blocks = k[:, :, :completed_length].reshape(B, H, num_completed_blocks, causal_block_size, Dh)  # [Codex comment] Group completed keys by their fixed global block.
-        v_blocks = v[:, :, :completed_length].reshape(B, H, num_completed_blocks, causal_block_size, Dh)  # [Codex comment] Group completed values by their fixed global block.
-        if share_linformer_projections_across_heads:  # [Codex comment] Select the einsum form when config shares compression weights across heads.
-            k_tilde = torch.einsum("bhkrd,kr->bhkd", k_blocks, self.E[:num_completed_blocks])  # [Codex comment] Produce one learned compressed key per completed block.
-            v_tilde = torch.einsum("bhkrd,kr->bhkd", v_blocks, self.F[:num_completed_blocks])  # [Codex comment] Produce one learned compressed value per completed block.
-        else:  # [Codex comment] Use independent blockwise compression weights for each head.
-            k_tilde = torch.einsum("bhkrd,hkr->bhkd", k_blocks, self.E[:, :num_completed_blocks])  # [Codex comment] Produce per-head compressed keys for completed blocks.
-            v_tilde = torch.einsum("bhkrd,hkr->bhkd", v_blocks, self.F[:, :num_completed_blocks])  # [Codex comment] Produce per-head compressed values for completed blocks.
-        return k_tilde, v_tilde  # [Codex comment] Return summaries used by the global attention branch.
+    def _compress_completed_blocks(self, k, v, num_completed_blocks):  #  Compress only blocks fully present in the current runtime prefix.
+        B, H, _, C = k.shape  
+        completed_length = num_completed_blocks * causal_block_size  
+        k_blocks = k[:, :, :completed_length].reshape(B, H, num_completed_blocks, causal_block_size, C)  #  Group completed keys by their fixed global block.
+        v_blocks = v[:, :, :completed_length].reshape(B, H, num_completed_blocks, causal_block_size, C)  #  Group completed values by their fixed global block.
+        if share_linformer_projections_across_heads:  #  Select the einsum form when config shares compression weights across heads.
+            k_tilde = torch.einsum("bhkrd,kr->bhkd", k_blocks, self.E[:num_completed_blocks])  
+            v_tilde = torch.einsum("bhkrd,kr->bhkd", v_blocks, self.F[:num_completed_blocks])  
+        else:  # Use independent blockwise compression weights for each head.
+            k_tilde = torch.einsum("bhkrd,hkr->bhkd", k_blocks, self.E[:, :num_completed_blocks])  
+            v_tilde = torch.einsum("bhkrd,hkr->bhkd", v_blocks, self.F[:, :num_completed_blocks])  
+        return k_tilde, v_tilde  # [B,n_head,num_completed_blocks,d_head]
 
     def forward(self, x):  # x.shape = [B,T,C]
         B, T, _ = x.shape  
@@ -77,29 +77,34 @@ class CausalBlockwiseLinformerAttention(nn.Module):
         v = v.view(B, T, n_heads, d_head).transpose(1, 2) 
         scale = d_head ** -0.5  
 
-        local_scores = (q @ k.transpose(-1, -2)) * scale  # [Codex comment] Compute dense scores for the correctness-first local implementation.
-        local_mask = self._build_local_mask(T, x.device)  # [Codex comment] Restrict local scores to causal keys inside the recent window.
-        local_scores = local_scores.masked_fill(~local_mask, float("-inf"))  # [Codex comment] Remove future and out-of-window keys before softmax.
-        local_weights = self.drop(F.softmax(local_scores, dim=-1))  # [Codex comment] Normalize and regularize exact local attention weights.
-        local_out = local_weights @ v  # [Codex comment] Aggregate exact local values for every query.
+        local_scores = (q @ k.transpose(-1, -2)) * scale  #  Compute dense scores for the correctness-first local implementation.
+        local_mask = self._build_local_mask(T, x.device)  #  Restrict local scores to causal keys inside the recent window.
+        local_scores = local_scores.masked_fill(~local_mask, float("-inf"))  # Remove future and out-of-window keys before softmax.
+        local_scores = F.softmax(local_scores, dim=-1)
+        local_scores = self.drop(local_scores)  
+        local_out = local_scores @ v  # [B,n_head,T,d_head]
 
-        num_completed_blocks = min(T // causal_block_size, num_global_blocks)  # [Codex comment] Count only config-sized blocks fully available in this runtime prefix.
-        global_out = torch.zeros_like(local_out)  # [Codex comment] Make the global contribution exactly zero when no block is complete.
-        if num_completed_blocks > 0:  # [Codex comment] Skip compression and softmax entirely for short prefixes with no global block.
-            k_tilde, v_tilde = self._compress_completed_blocks(k, v, num_completed_blocks)  # [Codex comment] Summarize only fully completed key and value blocks.
-            global_scores = (q @ k_tilde.transpose(-1, -2)) * scale  # [Codex comment] Score each query against available compressed keys.
-            global_mask = self._build_global_mask(T, num_completed_blocks, x.device)  # [Codex comment] Enforce that each query sees only blocks completed by that position.
-            global_scores = global_scores.masked_fill(~global_mask, float("-inf"))  # [Codex comment] Mask compressed blocks that are still future information for a query.
-            has_global = global_mask.any(dim=-1)  # [Codex comment] Identify query rows with at least one causally available block.
-            global_scores[:, :, ~has_global, :] = 0.0  # [Codex comment] Avoid all-negative-infinity softmax rows and their resulting NaNs.
-            global_weights = self.drop(F.softmax(global_scores, dim=-1))  # [Codex comment] Normalize and regularize valid compressed attention weights.
-            global_out = global_weights @ v_tilde  # [Codex comment] Aggregate globally compressed values for every query.
-            global_out = global_out * has_global.view(1, 1, T, 1).to(global_out.dtype)  # [Codex comment] Restore exact zero output for early queries with no completed block.
-
-        attn = local_out + global_out  # [Codex comment] Combine the two independently normalized branches required by the specification.
-        attn = attn.transpose(1, 2).contiguous().view(B, T, d_hidden)  # [Codex comment] Merge attention heads back into the configured model width.
-        attn = self.mix(attn)  # [Codex comment] Apply the usual output projection after merging heads.
-        return self.drop(attn)  # [Codex comment] Apply output dropout and preserve the existing attention-module shape contract.
+        num_completed_blocks = min(T // causal_block_size, num_global_blocks)  
+        global_out = torch.zeros_like(local_out)  
+        if num_completed_blocks > 0:  # Skip compression and softmax entirely for short prefixes with no global block.
+            k_tilde, v_tilde = self._compress_completed_blocks(k, v, num_completed_blocks)  # [B,n_head,num_completed_blocks,d_head]. Summarize only fully completed key and value blocks. 
+            global_scores = (q @ k_tilde.transpose(-1, -2)) * scale  # [B,n_head,T,num_completed_blocks]
+            
+            global_mask = self._build_global_mask(T, num_completed_blocks, x.device)  # Enforce that each query sees only blocks completed by that position.
+            global_scores = global_scores.masked_fill(~global_mask, float("-inf"))  #  Mask compressed blocks that are still future information for a query.
+            has_global = global_mask.any(dim=-1)  # Identify query rows with at least one causally available block.
+            global_scores[:, :, ~has_global, :] = 0.0  # Avoid all-negative-infinity softmax rows and their resulting NaNs.
+            
+            global_scores = F.softmax(global_scores, dim=-1)
+            global_scores[:, :, ~has_global, :] = 0.0 # Remove the fake softmax probabilities used only to avoid NaNs for queries with no completed global block.
+            global_scores = self.drop(global_scores)  
+            global_out = global_scores @ v_tilde  # [B,n_head,T,num_completed_blocks] @ [B,n_head,num_completed_blocks,d_head] = [B,n_head,T,d_head]
+            
+        attn = local_out + global_out  # Combine the two independently normalized branches 
+        attn = attn.transpose(1, 2).reshape(B, T, d_hidden)  
+        attn = self.mix(attn)  
+        attn = self.drop(attn)
+        return attn  
 
 
 class FeedForward(nn.Module):
