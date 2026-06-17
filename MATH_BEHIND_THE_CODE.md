@@ -8,7 +8,7 @@ The current configuration is:
 | --- | ---: | --- |
 | \(B\) | \(64\) | Training batch size |
 | \(T_{\max}\) | \(256\) | Maximum context length |
-| \(d_{\text{model}}\) | \(384\) | Hidden dimension |
+| \(d_{\mathrm{model}}\) | \(384\) | Hidden dimension |
 | \(L\) | \(6\) | Number of Transformer blocks |
 | \(H\) | \(6\) | Number of attention heads |
 | \(d_h\) | \(64\) | Dimension of each attention head |
@@ -20,7 +20,7 @@ The current configuration is:
 The head dimension is
 
 $$
-d_h = \frac{d_{\text{model}}}{H}
+d_h = \frac{d_{\mathrm{model}}}{H}
     = \frac{384}{6}
     = 64.
 $$
@@ -36,7 +36,7 @@ $$
 In `config.py`, this same value is named `causal_block_size`:
 
 $$
-\texttt{causal\_block\_size}=b=4.
+\mathtt{causal\_block\_size}=b=4.
 $$
 
 The local attention window is derived from the causal block size:
@@ -63,7 +63,7 @@ $$
 Each character is assigned an integer:
 
 $$
-\operatorname{encode}(c_i)=i.
+\mathrm{encode}(c_i)=i.
 $$
 
 The complete text becomes a one-dimensional token tensor:
@@ -75,11 +75,11 @@ $$
 The first \(90\%\) of the tensor is used for training and the final \(10\%\) is used for validation:
 
 $$
-D_{\text{train}} = D_{0:\lfloor0.9N\rfloor},
+D_{\mathrm{train}} = D_{0:\lfloor0.9N\rfloor},
 $$
 
 $$
-D_{\text{val}} = D_{\lfloor0.9N\rfloor:N}.
+D_{\mathrm{val}} = D_{\lfloor0.9N\rfloor:N}.
 $$
 
 For a sampled start position \(s\), a training input is
@@ -107,59 +107,59 @@ $$
 The token embedding table is
 
 $$
-W_{\text{tok}} \in \mathbb{R}^{V\times d_{\text{model}}}.
+W_{\mathrm{tok}} \in \mathbb{R}^{V\times d_{\mathrm{model}}}.
 $$
 
 For this dataset:
 
 $$
-W_{\text{tok}} \in \mathbb{R}^{64\times384}.
+W_{\mathrm{tok}} \in \mathbb{R}^{64\times384}.
 $$
 
 Every token id selects one row:
 
 $$
-E_{\text{tok}}[b,t,:]
+E_{\mathrm{tok}}[b,t,:]
 =
-W_{\text{tok}}[X[b,t],:].
+W_{\mathrm{tok}}[X[b,t],:].
 $$
 
 Thus,
 
 $$
-E_{\text{tok}} \in \mathbb{R}^{B\times T\times384}.
+E_{\mathrm{tok}} \in \mathbb{R}^{B\times T\times384}.
 $$
 
 The model also uses learned absolute position embeddings:
 
 $$
-W_{\text{pos}} \in \mathbb{R}^{T_{\max}\times d_{\text{model}}}
+W_{\mathrm{pos}} \in \mathbb{R}^{T_{\max}\times d_{\mathrm{model}}}
 =
 \mathbb{R}^{256\times384}.
 $$
 
-For a runtime sequence length \(T_{\text{cur}}\), the positions are
+For a runtime sequence length \(T_{\mathrm{cur}}\), the positions are
 
 $$
-0,1,\ldots,T_{\text{cur}}-1,
+0,1,\ldots,T_{\mathrm{cur}}-1,
 $$
 
 and the initial residual stream is
 
 $$
-X^{(0)} = E_{\text{tok}} + E_{\text{pos}}
+X^{(0)} = E_{\mathrm{tok}} + E_{\mathrm{pos}}
 \in
-\mathbb{R}^{B\times T_{\text{cur}}\times384}.
+\mathbb{R}^{B\times T_{\mathrm{cur}}\times384}.
 $$
 
 Parameter counts:
 
 $$
-\#W_{\text{tok}}=64\cdot384=24{,}576,
+\#W_{\mathrm{tok}}=64\cdot384=24{,}576,
 $$
 
 $$
-\#W_{\text{pos}}=256\cdot384=98{,}304.
+\#W_{\mathrm{pos}}=256\cdot384=98{,}304.
 $$
 
 ## Transformer Block
@@ -173,9 +173,9 @@ Y^{(\ell)}
 =
 X^{(\ell)}
 +
-\operatorname{Attention}_{\ell}
+\mathrm{Attention}_{\ell}
 \left(
-\operatorname{LayerNorm}_{\ell,\text{attn}}
+\mathrm{LayerNorm}_{\ell,\mathrm{attn}}
 (X^{(\ell)})
 \right).
 $$
@@ -187,9 +187,9 @@ X^{(\ell+1)}
 =
 Y^{(\ell)}
 +
-\operatorname{FFN}_{\ell}
+\mathrm{FFN}_{\ell}
 \left(
-\operatorname{LayerNorm}_{\ell,\text{ffn}}
+\mathrm{LayerNorm}_{\ell,\mathrm{ffn}}
 (Y^{(\ell)})
 \right).
 $$
@@ -197,7 +197,7 @@ $$
 Both residual additions preserve the shape
 
 $$
-\mathbb{R}^{B\times T_{\text{cur}}\times384}.
+\mathbb{R}^{B\times T_{\mathrm{cur}}\times384}.
 $$
 
 ## Layer Normalization
@@ -205,7 +205,7 @@ $$
 For one token vector
 
 $$
-x\in\mathbb{R}^{d_{\text{model}}},
+x\in\mathbb{R}^{d_{\mathrm{model}}},
 $$
 
 LayerNorm computes the coordinate mean
@@ -213,8 +213,8 @@ LayerNorm computes the coordinate mean
 $$
 \mu(x)
 =
-\frac{1}{d_{\text{model}}}
-\sum_{c=1}^{d_{\text{model}}}x_c,
+\frac{1}{d_{\mathrm{model}}}
+\sum_{c=1}^{d_{\mathrm{model}}}x_c,
 $$
 
 and variance
@@ -222,15 +222,15 @@ and variance
 $$
 \sigma^2(x)
 =
-\frac{1}{d_{\text{model}}}
-\sum_{c=1}^{d_{\text{model}}}
+\frac{1}{d_{\mathrm{model}}}
+\sum_{c=1}^{d_{\mathrm{model}}}
 (x_c-\mu(x))^2.
 $$
 
 The normalized output is
 
 $$
-\operatorname{LayerNorm}(x)_c
+\mathrm{LayerNorm}(x)_c
 =
 \gamma_c
 \frac{x_c-\mu(x)}
@@ -250,7 +250,7 @@ are learned parameters.
 Each LayerNorm therefore has
 
 $$
-2d_{\text{model}}=768
+2d_{\mathrm{model}}=768
 $$
 
 parameters.
@@ -258,7 +258,7 @@ parameters.
 Pre-normalization gives gradients a direct identity route through each residual addition:
 
 $$
-X\longmapsto X+f(\operatorname{LayerNorm}(X)).
+X\longmapsto X+f(\mathrm{LayerNorm}(X)).
 $$
 
 ## Shared Query, Key, and Value Projection
@@ -268,21 +268,21 @@ Both attention implementations begin in the same way.
 Given
 
 $$
-X\in\mathbb{R}^{B\times T_{\text{cur}}\times384},
+X\in\mathbb{R}^{B\times T_{\mathrm{cur}}\times384},
 $$
 
 one bias-free linear layer computes all queries, keys, and values:
 
 $$
-[Q_{\text{flat}};K_{\text{flat}};V_{\text{flat}}]
+[Q_{\mathrm{flat}};K_{\mathrm{flat}};V_{\mathrm{flat}}]
 =
-XW_{\text{QKV}},
+XW_{\mathrm{QKV}},
 $$
 
 where
 
 $$
-W_{\text{QKV}}
+W_{\mathrm{QKV}}
 \in
 \mathbb{R}^{384\times(3\cdot384)}.
 $$
@@ -292,9 +292,9 @@ The result is split and rearranged into heads:
 $$
 Q,K,V
 \in
-\mathbb{R}^{B\times H\times T_{\text{cur}}\times d_h}
+\mathbb{R}^{B\times H\times T_{\mathrm{cur}}\times d_h}
 =
-\mathbb{R}^{B\times6\times T_{\text{cur}}\times64}.
+\mathbb{R}^{B\times6\times T_{\mathrm{cur}}\times64}.
 $$
 
 The QKV projection contains
@@ -320,7 +320,7 @@ S
 =
 \frac{QK^T}{\sqrt{d_h}}
 \in
-\mathbb{R}^{B\times H\times T_{\text{cur}}\times T_{\text{cur}}}.
+\mathbb{R}^{B\times H\times T_{\mathrm{cur}}\times T_{\mathrm{cur}}}.
 $$
 
 At individual positions:
@@ -374,15 +374,15 @@ The masked probabilities are
 $$
 A
 =
-\operatorname{softmax}(S+M)
+\mathrm{softmax}(S+M)
 \in
-\mathbb{R}^{B\times H\times T_{\text{cur}}\times T_{\text{cur}}}.
+\mathbb{R}^{B\times H\times T_{\mathrm{cur}}\times T_{\mathrm{cur}}}.
 $$
 
 Every row sums to one before dropout:
 
 $$
-\sum_{j=0}^{T_{\text{cur}}-1}A_{b,h,i,j}=1.
+\sum_{j=0}^{T_{\mathrm{cur}}-1}A_{b,h,i,j}=1.
 $$
 
 ### Weighted Value Sum
@@ -390,17 +390,17 @@ $$
 The head outputs are
 
 $$
-O_{\text{heads}}=AV
+O_{\mathrm{heads}}=AV
 \in
-\mathbb{R}^{B\times H\times T_{\text{cur}}\times64}.
+\mathbb{R}^{B\times H\times T_{\mathrm{cur}}\times64}.
 $$
 
 The heads are concatenated:
 
 $$
-O_{\text{merged}}
+O_{\mathrm{merged}}
 \in
-\mathbb{R}^{B\times T_{\text{cur}}\times384}.
+\mathbb{R}^{B\times T_{\mathrm{cur}}\times384}.
 $$
 
 The output mixing layer computes
@@ -408,7 +408,7 @@ The output mixing layer computes
 $$
 O
 =
-O_{\text{merged}}W_O+b_O,
+O_{\mathrm{merged}}W_O+b_O,
 $$
 
 where
@@ -433,20 +433,20 @@ parameters per block.
 
 Ignoring constants:
 
-- QKV projection: \(O(BT_{\text{cur}}d_{\text{model}}^2)\)
-- Score matrix: \(O(BHT_{\text{cur}}^2d_h)\)
-- Weighted value sum: \(O(BHT_{\text{cur}}^2d_h)\)
-- Attention-weight memory: \(O(BHT_{\text{cur}}^2)\)
+- QKV projection: \(O(BT_{\mathrm{cur}}d_{\mathrm{model}}^2)\)
+- Score matrix: \(O(BHT_{\mathrm{cur}}^2d_h)\)
+- Weighted value sum: \(O(BHT_{\mathrm{cur}}^2d_h)\)
+- Attention-weight memory: \(O(BHT_{\mathrm{cur}}^2)\)
 
 The quadratic dependence on sequence length comes from the
 
 $$
-T_{\text{cur}}\times T_{\text{cur}}
+T_{\mathrm{cur}}\times T_{\mathrm{cur}}
 $$
 
 attention matrix.
 
-At \(T_{\text{cur}}=256\), each head has
+At \(T_{\mathrm{cur}}=256\), each head has
 
 $$
 256^2=65{,}536
@@ -471,9 +471,9 @@ The second attention implementation replaces full causal attention with two sepa
 $$
 O_i
 =
-O_i^{\text{local}}
+O_i^{\mathrm{local}}
 +
-O_i^{\text{global}}.
+O_i^{\mathrm{global}}.
 $$
 
 The local branch preserves exact recent-token attention. The global branch provides compressed information from completed fixed-size blocks.
@@ -513,36 +513,36 @@ $$
 Therefore:
 
 $$
-M^{\text{local}}_{i,j}
+M^{\mathrm{local}}_{i,j}
 =
 \begin{cases}
 0, & 0\le i-j<3,\\
--\infty, & \text{otherwise}.
+-\infty, & \mathrm{otherwise}.
 \end{cases}
 $$
 
 The local scores and probabilities are
 
 $$
-S^{\text{local}}
+S^{\mathrm{local}}
 =
 \frac{QK^T}{\sqrt{d_h}}
 +
-M^{\text{local}},
+M^{\mathrm{local}},
 $$
 
 $$
-A^{\text{local}}
+A^{\mathrm{local}}
 =
-\operatorname{softmax}(S^{\text{local}}).
+\mathrm{softmax}(S^{\mathrm{local}}).
 $$
 
 The exact local output is
 
 $$
-O^{\text{local}}
+O^{\mathrm{local}}
 =
-A^{\text{local}}V.
+A^{\mathrm{local}}V.
 $$
 
 For example:
@@ -555,19 +555,19 @@ For example:
 The current code constructs a dense
 
 $$
-T_{\text{cur}}\times T_{\text{cur}}
+T_{\mathrm{cur}}\times T_{\mathrm{cur}}
 $$
 
 score matrix and masks most entries. This is mathematically local attention, but its current implementation still takes
 
 $$
-O(BHT_{\text{cur}}^2d_h)
+O(BHT_{\mathrm{cur}}^2d_h)
 $$
 
 time and
 
 $$
-O(BHT_{\text{cur}}^2)
+O(BHT_{\mathrm{cur}}^2)
 $$
 
 score memory.
@@ -575,13 +575,13 @@ score memory.
 A future banded or sliding-window implementation could compute only the \(w\) permitted keys per query, reducing the local branch to
 
 $$
-O(BHT_{\text{cur}}wd_h)
+O(BHT_{\mathrm{cur}}wd_h)
 $$
 
 time and
 
 $$
-O(BHT_{\text{cur}}w)
+O(BHT_{\mathrm{cur}}w)
 $$
 
 attention-weight memory.
@@ -626,30 +626,30 @@ $$
 \mathcal{B}_{63}=\{252,253,254,255\}.
 $$
 
-For a changing runtime prefix \(T_{\text{cur}}\), the number of complete blocks is
+For a changing runtime prefix \(T_{\mathrm{cur}}\), the number of complete blocks is
 
 $$
-K_{\text{complete}}
+K_{\mathrm{complete}}
 =
 \left\lfloor
-\frac{T_{\text{cur}}}{4}
+\frac{T_{\mathrm{cur}}}{4}
 \right\rfloor.
 $$
 
 Since the model never receives more than \(256\) positions:
 
 $$
-K_{\text{complete}}
+K_{\mathrm{complete}}
 =
 \min\left(
-\left\lfloor\frac{T_{\text{cur}}}{4}\right\rfloor,
+\left\lfloor\frac{T_{\mathrm{cur}}}{4}\right\rfloor,
 64
 \right).
 $$
 
 Examples:
 
-| Runtime length \(T_{\text{cur}}\) | Completed blocks | Globally compressed tokens | Partial local-only tokens |
+| Runtime length \(T_{\mathrm{cur}}\) | Completed blocks | Globally compressed tokens | Partial local-only tokens |
 | ---: | ---: | --- | --- |
 | \(3\) | \(0\) | none | \(0\ldots2\) |
 | \(4\) | \(1\) | \(0\ldots3\) | none |
@@ -681,15 +681,15 @@ After splitting into heads:
 $$
 K,V
 \in
-\mathbb{R}^{B\times H\times T_{\text{cur}}\times d_h}.
+\mathbb{R}^{B\times H\times T_{\mathrm{cur}}\times d_h}.
 $$
 
 Only the completed prefix is reshaped into blocks:
 
 $$
-K_{\text{blocks}},V_{\text{blocks}}
+K_{\mathrm{blocks}},V_{\mathrm{blocks}}
 \in
-\mathbb{R}^{B\times H\times K_{\text{complete}}\times b\times d_h}.
+\mathbb{R}^{B\times H\times K_{\mathrm{complete}}\times b\times d_h}.
 $$
 
 With per-head projections, the learned compression parameters are
@@ -731,7 +731,7 @@ Therefore,
 $$
 \widetilde{K},\widetilde{V}
 \in
-\mathbb{R}^{B\times H\times K_{\text{complete}}\times d_h}.
+\mathbb{R}^{B\times H\times K_{\mathrm{complete}}\times d_h}.
 $$
 
 Each completed group of four key vectors becomes one compressed key vector per head. Each completed group of four value vectors becomes one compressed value vector per head.
@@ -816,7 +816,7 @@ $$
 Its final position is
 
 $$
-\operatorname{end}(a)
+\mathrm{end}(a)
 =(a+1)b-1.
 $$
 
@@ -839,11 +839,11 @@ With \(b=4\):
 The global mask is
 
 $$
-M^{\text{global}}_{i,a}
+M^{\mathrm{global}}_{i,a}
 =
 \begin{cases}
 0, & (a+1)b-1\le i,\\
--\infty, & \text{otherwise}.
+-\infty, & \mathrm{otherwise}.
 \end{cases}
 $$
 
@@ -852,32 +852,32 @@ $$
 The global score tensor is
 
 $$
-S^{\text{global}}
+S^{\mathrm{global}}
 =
 \frac{Q\widetilde{K}^T}{\sqrt{d_h}}
 \in
-\mathbb{R}^{B\times H\times T_{\text{cur}}\times K_{\text{complete}}}.
+\mathbb{R}^{B\times H\times T_{\mathrm{cur}}\times K_{\mathrm{complete}}}.
 $$
 
 After the causal block mask:
 
 $$
-A^{\text{global}}
+A^{\mathrm{global}}
 =
-\operatorname{softmax}
+\mathrm{softmax}
 \left(
-S^{\text{global}}+M^{\text{global}}
+S^{\mathrm{global}}+M^{\mathrm{global}}
 \right).
 $$
 
 The global output is
 
 $$
-O^{\text{global}}
+O^{\mathrm{global}}
 =
-A^{\text{global}}\widetilde{V}
+A^{\mathrm{global}}\widetilde{V}
 \in
-\mathbb{R}^{B\times H\times T_{\text{cur}}\times d_h}.
+\mathbb{R}^{B\times H\times T_{\mathrm{cur}}\times d_h}.
 $$
 
 At the final position of a full 256-token context, a query can attend to all 64 compressed keys:
@@ -916,9 +916,9 @@ The code handles this in two steps:
 Mathematically:
 
 $$
-O_i^{\text{global}}=0
+O_i^{\mathrm{global}}=0
 \qquad
-\text{when no block is available to query }i.
+\mathrm{when\ no\ block\ is\ available\ to\ query\ }i.
 $$
 
 This preserves the intended operator and prevents NaNs.
@@ -928,9 +928,9 @@ This preserves the intended operator and prevents NaNs.
 The two branches use separate softmax normalizations:
 
 $$
-O_i^{\text{local}}
+O_i^{\mathrm{local}}
 =
-\operatorname{softmax}
+\mathrm{softmax}
 \left(
 \frac{q_iK_{\mathcal{L}_i}^T}{\sqrt{d_h}}
 \right)
@@ -938,9 +938,9 @@ V_{\mathcal{L}_i},
 $$
 
 $$
-O_i^{\text{global}}
+O_i^{\mathrm{global}}
 =
-\operatorname{softmax}
+\mathrm{softmax}
 \left(
 \frac{q_i\widetilde{K}_{\mathcal{G}_i}^T}{\sqrt{d_h}}
 \right)
@@ -952,9 +952,9 @@ They are then added:
 $$
 O_i
 =
-O_i^{\text{local}}
+O_i^{\mathrm{local}}
 +
-O_i^{\text{global}}.
+O_i^{\mathrm{global}}.
 $$
 
 This is not equivalent to concatenating local and global keys and applying one softmax. Each nonempty branch independently assigns total probability mass one before dropout.
@@ -986,7 +986,7 @@ This overlap is part of the specified operator. The global branch is a learned s
 Every completed key and value is used once in its block summary:
 
 $$
-O(BHT_{\text{cur}}d_h).
+O(BHT_{\mathrm{cur}}d_h).
 $$
 
 ### Global Scores
@@ -994,18 +994,18 @@ $$
 Each query compares against at most \(K\) compressed keys:
 
 $$
-O(BHT_{\text{cur}}Kd_h).
+O(BHT_{\mathrm{cur}}Kd_h).
 $$
 
 The global attention-weight tensor has at most
 
 $$
-B\times H\times T_{\text{cur}}\times K
+B\times H\times T_{\mathrm{cur}}\times K
 $$
 
 entries.
 
-At \(T_{\text{cur}}=256\), \(H=6\), \(K=64\), and \(B=64\):
+At \(T_{\mathrm{cur}}=256\), \(H=6\), \(K=64\), and \(B=64\):
 
 $$
 64\cdot6\cdot256\cdot64
@@ -1021,7 +1021,7 @@ With true sliding-window local attention, the attention-specific cost would be
 
 $$
 O\left(
-BHT_{\text{cur}}(w+K)d_h
+BHT_{\mathrm{cur}}(w+K)d_h
 \right),
 $$
 
@@ -1029,24 +1029,24 @@ and attention-weight memory would be
 
 $$
 O\left(
-BHT_{\text{cur}}(w+K)
+BHT_{\mathrm{cur}}(w+K)
 \right).
 $$
 
-For fixed \(w\) and \(K\), this is linear in \(T_{\text{cur}}\).
+For fixed \(w\) and \(K\), this is linear in \(T_{\mathrm{cur}}\).
 
 ### Current Implemented Total
 
 The current local branch is dense and masked. Consequently, the implementation still has a quadratic local score matrix:
 
 $$
-O(BHT_{\text{cur}}^2d_h)
+O(BHT_{\mathrm{cur}}^2d_h)
 $$
 
 time and
 
 $$
-O(BHT_{\text{cur}}^2)
+O(BHT_{\mathrm{cur}}^2)
 $$
 
 score memory.
@@ -1068,7 +1068,7 @@ $$
 the first layer expands it to four times the hidden dimension:
 
 $$
-u=xW_{\text{up}}+b_{\text{up}}
+u=xW_{\mathrm{up}}+b_{\mathrm{up}}
 \in
 \mathbb{R}^{1536}.
 $$
@@ -1076,7 +1076,7 @@ $$
 The activation is ReLU:
 
 $$
-\operatorname{ReLU}(u)_j
+\mathrm{ReLU}(u)_j
 =
 \max(0,u_j).
 $$
@@ -1084,11 +1084,11 @@ $$
 The second layer projects back:
 
 $$
-\operatorname{FFN}(x)
+\mathrm{FFN}(x)
 =
-\operatorname{ReLU}(u)W_{\text{down}}
+\mathrm{ReLU}(u)W_{\mathrm{down}}
 +
-b_{\text{down}}
+b_{\mathrm{down}}
 \in
 \mathbb{R}^{384}.
 $$
@@ -1096,15 +1096,15 @@ $$
 Shapes:
 
 $$
-W_{\text{up}}\in\mathbb{R}^{384\times1536},
+W_{\mathrm{up}}\in\mathbb{R}^{384\times1536},
 \qquad
-b_{\text{up}}\in\mathbb{R}^{1536},
+b_{\mathrm{up}}\in\mathbb{R}^{1536},
 $$
 
 $$
-W_{\text{down}}\in\mathbb{R}^{1536\times384},
+W_{\mathrm{down}}\in\mathbb{R}^{1536\times384},
 \qquad
-b_{\text{down}}\in\mathbb{R}^{384}.
+b_{\mathrm{down}}\in\mathbb{R}^{384}.
 $$
 
 Parameter count:
@@ -1138,7 +1138,7 @@ After six blocks:
 $$
 X^{(6)}
 \in
-\mathbb{R}^{B\times T_{\text{cur}}\times384}.
+\mathbb{R}^{B\times T_{\mathrm{cur}}\times384}.
 $$
 
 The final LayerNorm produces
@@ -1146,7 +1146,7 @@ The final LayerNorm produces
 $$
 \widetilde{X}
 =
-\operatorname{LayerNorm}(X^{(6)}).
+\mathrm{LayerNorm}(X^{(6)}).
 $$
 
 The language-model head maps each token vector to vocabulary logits:
@@ -1154,21 +1154,21 @@ The language-model head maps each token vector to vocabulary logits:
 $$
 Z
 =
-\widetilde{X}W_{\text{LM}}+b_{\text{LM}},
+\widetilde{X}W_{\mathrm{LM}}+b_{\mathrm{LM}},
 $$
 
 where
 
 $$
-W_{\text{LM}}\in\mathbb{R}^{384\times64},
+W_{\mathrm{LM}}\in\mathbb{R}^{384\times64},
 \qquad
-b_{\text{LM}}\in\mathbb{R}^{64}.
+b_{\mathrm{LM}}\in\mathbb{R}^{64}.
 $$
 
 Therefore:
 
 $$
-Z\in\mathbb{R}^{B\times T_{\text{cur}}\times64}.
+Z\in\mathbb{R}^{B\times T_{\mathrm{cur}}\times64}.
 $$
 
 The token embedding and language-model head are separate parameters in this implementation. Their weights are not tied.
@@ -1187,7 +1187,7 @@ $$
 The batch cross-entropy is
 
 $$
-\mathcal{L}_{\text{train}}
+\mathcal{L}_{\mathrm{train}}
 =
 -\frac{1}{BT}
 \sum_{b=1}^{B}
@@ -1201,7 +1201,7 @@ $$
 The loss plot records one scalar
 
 $$
-\mathcal{L}_{\text{train}}^{(s)}
+\mathcal{L}_{\mathrm{train}}^{(s)}
 $$
 
 for every optimization step \(s\). `train.py` saves each plot in `docs/` with the attention type and a timestamp in the filename, so repeated runs do not overwrite earlier plots.
@@ -1210,10 +1210,10 @@ for every optimization step \(s\). `train.py` saves each plot in `docs/` with th
 
 The validation script loads `model.pth`, switches the model to evaluation mode, and divides the validation split into contiguous contexts.
 
-Suppose the validation split provides \(N_{\text{val}}-1\) next-token targets. If chunk \(c\) contains \(n_c\) targets and has mean loss \(\mathcal{L}_c\), then the full token-weighted validation loss is
+Suppose the validation split provides \(N_{\mathrm{val}}-1\) next-token targets. If chunk \(c\) contains \(n_c\) targets and has mean loss \(\mathcal{L}_c\), then the full token-weighted validation loss is
 
 $$
-\mathcal{L}_{\text{val}}
+\mathcal{L}_{\mathrm{val}}
 =
 \frac{
 \sum_c n_c\mathcal{L}_c
@@ -1227,9 +1227,9 @@ Weighting by \(n_c\) matters because the final chunk may be shorter than 256 tok
 The reported perplexity is
 
 $$
-\operatorname{PPL}
+\mathrm{PPL}
 =
-\exp(\mathcal{L}_{\text{val}}).
+\exp(\mathcal{L}_{\mathrm{val}}).
 $$
 
 Lower validation loss and lower perplexity indicate that the model assigns more probability to the correct next characters on held-out text.
@@ -1288,7 +1288,7 @@ For Linformer generation, the runtime sequence length does not need to be divisi
 For one standard attention layer:
 
 $$
-\#W_{\text{QKV}}
+\#W_{\mathrm{QKV}}
 =
 442{,}368,
 $$
@@ -1302,7 +1302,7 @@ $$
 Therefore:
 
 $$
-\#\operatorname{Attention}_{\text{standard}}
+\#\mathrm{Attention}_{\mathrm{standard}}
 =
 590{,}208
 $$
@@ -1466,9 +1466,9 @@ Using separate \(E\) and \(F\) matrices allows the model to learn one positional
 Standard causal attention acts as the baseline:
 
 $$
-O_{\text{standard}}
+O_{\mathrm{standard}}
 =
-\operatorname{softmax}
+\mathrm{softmax}
 \left(
 \frac{QK^T}{\sqrt{d_h}}+M
 \right)V.
@@ -1492,9 +1492,9 @@ The compression is lossy: each four-token block is reduced to one vector per hea
 Standard causal attention:
 
 $$
-O_i^{\text{standard}}
+O_i^{\mathrm{standard}}
 =
-\operatorname{Attn}
+\mathrm{Attn}
 \left(
 q_i,
 K_{\{0,\ldots,i\}},
@@ -1505,16 +1505,16 @@ $$
 Causal blockwise Linformer attention:
 
 $$
-O_i^{\text{Linformer}}
+O_i^{\mathrm{Linformer}}
 =
-\operatorname{Attn}
+\mathrm{Attn}
 \left(
 q_i,
 K_{\mathcal{L}_i},
 V_{\mathcal{L}_i}
 \right)
 +
-\operatorname{Attn}
+\mathrm{Attn}
 \left(
 q_i,
 \widetilde{K}_{\mathcal{G}_i},

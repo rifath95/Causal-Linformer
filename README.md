@@ -32,7 +32,7 @@ attention_type = "standard"
 Standard attention computes full causal self-attention:
 
 $$
-O = \operatorname{softmax}\left(\frac{QK^T}{\sqrt{d_h}} + M\right)V
+O = \mathrm{softmax}\left(\frac{QK^T}{\sqrt{d_h}} + M\right)V
 $$
 
 where the causal mask allows position $i$ to attend only to positions $j \le i$.
@@ -46,7 +46,7 @@ attention_type = "causal_blockwise_linformer"
 The Linformer variant computes:
 
 $$
-O_i = O_i^{\text{local}} + O_i^{\text{global}}
+O_i = O_i^{\mathrm{local}} + O_i^{\mathrm{global}}
 $$
 
 The local branch attends exactly to recent tokens:
