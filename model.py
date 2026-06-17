@@ -35,40 +35,24 @@ class MultiHeadAttention(nn.Module):
 
 
 class CausalBlockwiseLinformerAttention(nn.Module):  
-    def __init__(  
-        self,  
-        hidden_size=d_hidden,  # [Codex comment] Match the model hidden width by default.
-        num_heads=n_heads,  # [Codex comment] Match the configured attention-head count by default.
-        window_size=local_window,  # [Codex comment] Use the configured exact local window by default.
-        global_blocks=num_global_blocks,  # [Codex comment] Use the configured number of global summaries by default.
-        share_projections=share_linformer_projections_across_heads,  # [Codex comment] Respect whether compression weights are shared across heads.
-        attention_dropout=dropout,  # [Codex comment] Reuse the model dropout rate for attention weights and outputs.
-    ):  
+    def __init__(self):  # [Codex comment] Use config.py values directly instead of passing duplicate constructor aliases.
         super().__init__()  
-        if hidden_size % num_heads != 0:  # [Codex comment] Ensure each head receives an integer feature width.
-            raise ValueError("hidden_size must be divisible by num_heads")  # [Codex comment] Report an invalid head configuration clearly.
-        if block_size % global_blocks != 0:  # [Codex comment] Require fixed maximum-context blocks to have equal sizes.
-            raise ValueError("block_size must be divisible by global_blocks")  # [Codex comment] Explain the fixed-block configuration requirement.
-        if window_size <= 0:  # [Codex comment] Reject a local branch that would leave queries without any valid exact key.
-            raise ValueError("window_size must be positive")  # [Codex comment] Explain the valid local-window range.
-        self.hidden_size = hidden_size  # [Codex comment] Store the width used when heads are merged.
-        self.num_heads = num_heads  # [Codex comment] Store the number of parallel attention heads.
-        self.head_size = hidden_size // num_heads  # [Codex comment] Derive the feature width handled by each head.
-        self.window_size = window_size  # [Codex comment] Store the exact causal sliding-window width.
-        self.global_blocks = global_blocks  # [Codex comment] Store the maximum number of compressed block summaries.
-        self.global_block_size = block_size // global_blocks  # [Codex comment] Fix block width from maximum context rather than runtime prefix length.
-        self.share_projections = share_projections  # [Codex comment] Remember whether all heads use the same compression weights.
-        self.qkv = nn.Linear(hidden_size, 3 * hidden_size, bias=False)  
-        projection_shape = (global_blocks, self.global_block_size) if share_projections else (num_heads, global_blocks, self.global_block_size)  # [Codex comment] Choose shared or per-head blockwise projection parameter shapes.
+        if block_size % num_global_blocks != 0:  # [Codex comment] Require config maximum-context blocks to have equal sizes.
+            raise ValueError("block_size must be divisible by num_global_blocks")  # [Codex comment] Report invalid blockwise compression settings clearly.
+        if local_window <= 0:  # [Codex comment] Reject a local branch that would leave queries without any exact key.
+            raise ValueError("local_window must be positive")  # [Codex comment] Explain the valid local-window range using the config name.
+        self.global_block_size = block_size // num_global_blocks  # [Codex comment] Derive the fixed compression block width from config.py.
+        self.qkv = nn.Linear(d_hidden, 3 * d_hidden, bias=False)  # [Codex comment] Project hidden states to queries, keys, and values using config width.
+        projection_shape = (num_global_blocks, self.global_block_size) if share_linformer_projections_across_heads else (n_heads, num_global_blocks, self.global_block_size)  # [Codex comment] Choose shared or per-head E/F shapes directly from config.py.
         self.E = nn.Parameter(torch.full(projection_shape, 1.0 / self.global_block_size))  # [Codex comment] Initialize key compression as average pooling within each block.
         self.F = nn.Parameter(torch.full(projection_shape, 1.0 / self.global_block_size))  # [Codex comment] Initialize value compression as average pooling within each block.
-        self.mix = nn.Linear(hidden_size, hidden_size)  # [Codex comment] Mix merged attention heads using the existing output-projection pattern.
-        self.drop = nn.Dropout(attention_dropout)  # [Codex comment] Apply configured dropout to attention probabilities and projected output.
+        self.mix = nn.Linear(d_hidden, d_hidden)  # [Codex comment] Mix merged attention heads using the configured model width.
+        self.drop = nn.Dropout(dropout)  # [Codex comment] Apply config dropout to attention probabilities and projected output.
 
     def _build_local_mask(self, length, device):  # [Codex comment] Build the dense exact-local causal mask for a runtime prefix.
         positions = torch.arange(length, device=device)  # [Codex comment] Create query and key position indices on the input device.
         distance = positions[:, None] - positions[None, :]  # [Codex comment] Measure how far each key lies behind each query.
-        return (distance >= 0) & (distance < self.window_size)  # [Codex comment] Allow only current and recent keys inside the local window.
+        return (distance >= 0) & (distance < local_window)  # [Codex comment] Allow only current and recent keys inside the config local window.
 
     def _build_global_mask(self, length, num_completed_blocks, device):  # [Codex comment] Build the inclusive causal mask over completed global blocks.
         query_positions = torch.arange(length, device=device)[:, None]  # [Codex comment] Represent every runtime query position as a mask row.
@@ -80,7 +64,7 @@ class CausalBlockwiseLinformerAttention(nn.Module):
         completed_length = num_completed_blocks * self.global_block_size  # [Codex comment] Exclude the trailing partial block from global compression.
         k_blocks = k[:, :, :completed_length].reshape(B, H, num_completed_blocks, self.global_block_size, Dh)  # [Codex comment] Group completed keys by their fixed global block.
         v_blocks = v[:, :, :completed_length].reshape(B, H, num_completed_blocks, self.global_block_size, Dh)  # [Codex comment] Group completed values by their fixed global block.
-        if self.share_projections:  # [Codex comment] Select the einsum form for compression weights shared across heads.
+        if share_linformer_projections_across_heads:  # [Codex comment] Select the einsum form when config shares compression weights across heads.
             k_tilde = torch.einsum("bhkrd,kr->bhkd", k_blocks, self.E[:num_completed_blocks])  # [Codex comment] Produce one learned compressed key per completed block.
             v_tilde = torch.einsum("bhkrd,kr->bhkd", v_blocks, self.F[:num_completed_blocks])  # [Codex comment] Produce one learned compressed value per completed block.
         else:  # [Codex comment] Use independent blockwise compression weights for each head.
@@ -104,7 +88,7 @@ class CausalBlockwiseLinformerAttention(nn.Module):
         local_weights = self.drop(F.softmax(local_scores, dim=-1))  # [Codex comment] Normalize and regularize exact local attention weights.
         local_out = local_weights @ v  # [Codex comment] Aggregate exact local values for every query.
 
-        num_completed_blocks = min(T // self.global_block_size, self.global_blocks)  # [Codex comment] Count only fixed-size blocks fully available in this runtime prefix.
+        num_completed_blocks = min(T // self.global_block_size, num_global_blocks)  # [Codex comment] Count only config-sized blocks fully available in this runtime prefix.
         global_out = torch.zeros_like(local_out)  # [Codex comment] Make the global contribution exactly zero when no block is complete.
         if num_completed_blocks > 0:  # [Codex comment] Skip compression and softmax entirely for short prefixes with no global block.
             k_tilde, v_tilde = self._compress_completed_blocks(k, v, num_completed_blocks)  # [Codex comment] Summarize only fully completed key and value blocks.
@@ -118,7 +102,7 @@ class CausalBlockwiseLinformerAttention(nn.Module):
             global_out = global_out * has_global.view(1, 1, T, 1).to(global_out.dtype)  # [Codex comment] Restore exact zero output for early queries with no completed block.
 
         attn = local_out + global_out  # [Codex comment] Combine the two independently normalized branches required by the specification.
-        attn = attn.transpose(1, 2).contiguous().view(B, T, self.hidden_size)  # [Codex comment] Merge attention heads back into model-width hidden states.
+        attn = attn.transpose(1, 2).contiguous().view(B, T, d_hidden)  # [Codex comment] Merge attention heads back into the configured model width.
         attn = self.mix(attn)  # [Codex comment] Apply the usual output projection after merging heads.
         return self.drop(attn)  # [Codex comment] Apply output dropout and preserve the existing attention-module shape contract.
 
